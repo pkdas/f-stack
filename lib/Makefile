@@ -14,11 +14,11 @@ S=${TOPDIR}/freebsd
 MACHINE_INCLUDES_ROOT:=${CURDIR}/machine_include
 OVERRIDE_INCLUDES_ROOT:=${CURDIR}/include
 X86_INCLUDES=0
-PREFIX=/usr/local
+PREFIX=${DESTDIR}/usr/local
 PREFIX_LIB=${PREFIX}/lib
-PREFIX_INCLUDE=/usr/local/include
-PREFIX_BIN=/usr/local/bin
-F-STACK_CONF=/etc/f-stack.conf
+PREFIX_INCLUDE=${DESTDIR}/usr/local/include
+PREFIX_BIN=${DESTDIR}/usr/local/bin
+F-STACK_CONF=${DESTDIR}/etc/f-stack.conf
 F-STACK_VERSION=1.20
 
 HOST_OS:=$(shell uname -s)

@@ -233,6 +233,7 @@ init_lcore_conf(void)
     lcore_conf.port_cfgs = ff_global_cfg.dpdk.port_cfgs;
     lcore_conf.proc_id = ff_global_cfg.dpdk.proc_id;
 
+#if 0 // PK FIXME - this check is not needed since DPDK rte_eal_init takes care of it
     uint16_t proc_id;
     for (proc_id = 0; proc_id < ff_global_cfg.dpdk.nb_procs; proc_id++) {
         uint16_t lcore_id = ff_global_cfg.dpdk.proc_lcore[proc_id];
@@ -240,6 +241,7 @@ init_lcore_conf(void)
             rte_exit(EXIT_FAILURE, "lcore %u unavailable\n", lcore_id);
         }
     }
+#endif
 
     uint16_t socket_id = 0;
     if (numa_on) {
@@ -568,7 +570,7 @@ init_port_start(void)
                     dev_info.max_tx_queues);
             }
 
-            struct ether_addr addr;
+            struct rte_ether_addr addr;
             rte_eth_macaddr_get(port_id, &addr);
             printf("Port %u MAC: %02" PRIx8 " %02" PRIx8 " %02" PRIx8
                        " %02" PRIx8 " %02" PRIx8 " %02" PRIx8 "\n",
@@ -578,7 +580,7 @@ init_port_start(void)
                     addr.addr_bytes[4], addr.addr_bytes[5]);
 
             rte_memcpy(pconf->mac,
-                addr.addr_bytes, ETHER_ADDR_LEN);
+                addr.addr_bytes, RTE_ETHER_ADDR_LEN);
 
             /* Set RSS mode */
             uint64_t default_rss_hf = ETH_RSS_PROTO_MASK;
@@ -724,7 +726,7 @@ init_port_start(void)
                         addr.addr_bytes[4], addr.addr_bytes[5]);
 
                 rte_memcpy(pconf->mac,
-                    addr.addr_bytes, ETHER_ADDR_LEN);
+                    addr.addr_bytes, RTE_ETHER_ADDR_LEN);
 
                 int mode, count, x;
                 uint16_t slaves[RTE_MAX_ETHPORTS], len = RTE_MAX_ETHPORTS;
@@ -904,28 +906,28 @@ ff_veth_input(const struct ff_dpdk_if_context *ctx, struct rte_mbuf *pkt)
 static enum FilterReturn
 protocol_filter(const void *data, uint16_t len)
 {
-    if(len < ETHER_HDR_LEN)
+    if(len < RTE_ETHER_HDR_LEN)
         return FILTER_UNKNOWN;
 
-    const struct ether_hdr *hdr;
-    const struct vlan_hdr *vlanhdr;
-    hdr = (const struct ether_hdr *)data;
+    const struct rte_ether_hdr *hdr;
+    const struct rte_vlan_hdr *vlanhdr;
+    hdr = (const struct rte_ether_hdr *)data;
     uint16_t ether_type = rte_be_to_cpu_16(hdr->ether_type);
-    data += ETHER_HDR_LEN;
-    len -= ETHER_HDR_LEN;
+    data += RTE_ETHER_HDR_LEN;
+    len -= RTE_ETHER_HDR_LEN;
 
-    if (ether_type == ETHER_TYPE_VLAN) {
-        vlanhdr = (struct vlan_hdr *)data;
+    if (ether_type == RTE_ETHER_TYPE_VLAN) {
+        vlanhdr = (struct rte_vlan_hdr *)data;
         ether_type = rte_be_to_cpu_16(vlanhdr->eth_proto);
-        data += sizeof(struct vlan_hdr);
-        len -= sizeof(struct vlan_hdr);
+        data += sizeof(struct rte_vlan_hdr);
+        len -= sizeof(struct rte_vlan_hdr);
     }
 
-    if(ether_type == ETHER_TYPE_ARP)
+    if(ether_type == RTE_ETHER_TYPE_ARP)
         return FILTER_ARP;
 
 #ifdef INET6
-    if (ether_type == ETHER_TYPE_IPv6) {
+    if (ether_type == RTE_ETHER_TYPE_IPV6) {
         return ff_kni_proto_filter(data,
             len, ether_type);
     }
@@ -938,7 +940,7 @@ protocol_filter(const void *data, uint16_t len)
         return FILTER_UNKNOWN;
     }
 
-    if(ether_type != ETHER_TYPE_IPv4)
+    if(ether_type != RTE_ETHER_TYPE_IPV4)
         return FILTER_UNKNOWN;
 
     return ff_kni_proto_filter(data,
@@ -1040,14 +1042,14 @@ process_packets(uint16_t port_id, uint16_t queue_id, struct rte_mbuf **bufs,
                  * We have not support vlan out strip
                  */
                 if (rtem->vlan_tci) {
-                    data = rte_pktmbuf_prepend(rtem, sizeof(struct vlan_hdr));
+                    data = rte_pktmbuf_prepend(rtem, sizeof(struct rte_vlan_hdr));
                     if (data != NULL) {
-                        memmove(data, data + sizeof(struct vlan_hdr), ETHER_HDR_LEN);
-                        struct ether_hdr *etherhdr = (struct ether_hdr *)data;
-                        struct vlan_hdr *vlanhdr = (struct vlan_hdr *)(data + ETHER_HDR_LEN);
+                        memmove(data, data + sizeof(struct rte_vlan_hdr), RTE_ETHER_HDR_LEN);
+                        struct rte_ether_hdr *etherhdr = (struct rte_ether_hdr *)data;
+                        struct rte_vlan_hdr *vlanhdr = (struct rte_vlan_hdr *)(data + RTE_ETHER_HDR_LEN);
                         vlanhdr->vlan_tci = rte_cpu_to_be_16(rtem->vlan_tci);
                         vlanhdr->eth_proto = etherhdr->ether_type;
-                        etherhdr->ether_type = rte_cpu_to_be_16(ETHER_TYPE_VLAN);
+                        etherhdr->ether_type = rte_cpu_to_be_16(RTE_ETHER_TYPE_VLAN);
                     }
                 }
                 send_single_packet(rtem, port_id);
@@ -1444,25 +1446,25 @@ ff_dpdk_if_send(struct ff_dpdk_if_context *ctx, void *m,
 
     if (offload.ip_csum) {
         /* ipv6 not supported yet */
-        struct ipv4_hdr *iph;
+        struct rte_ipv4_hdr *iph;
         int iph_len;
-        iph = (struct ipv4_hdr *)(data + ETHER_HDR_LEN);
+        iph = (struct rte_ipv4_hdr *)(data + RTE_ETHER_HDR_LEN);
         iph_len = (iph->version_ihl & 0x0f) << 2;
 
         head->ol_flags |= PKT_TX_IP_CKSUM | PKT_TX_IPV4;
-        head->l2_len = ETHER_HDR_LEN;
+        head->l2_len = RTE_ETHER_HDR_LEN;
         head->l3_len = iph_len;
     }
 
     if (ctx->hw_features.tx_csum_l4) {
-        struct ipv4_hdr *iph;
+        struct rte_ipv4_hdr *iph;
         int iph_len;
-        iph = (struct ipv4_hdr *)(data + ETHER_HDR_LEN);
+        iph = (struct rte_ipv4_hdr *)(data + RTE_ETHER_HDR_LEN);
         iph_len = (iph->version_ihl & 0x0f) << 2;
 
         if (offload.tcp_csum) {
             head->ol_flags |= PKT_TX_TCP_CKSUM;
-            head->l2_len = ETHER_HDR_LEN;
+            head->l2_len = RTE_ETHER_HDR_LEN;
             head->l3_len = iph_len;
         }
 
@@ -1482,9 +1484,9 @@ ff_dpdk_if_send(struct ff_dpdk_if_context *ctx, void *m,
          *    used as helpers.
          */
         if (offload.tso_seg_size) {
-            struct tcp_hdr *tcph;
+            struct rte_tcp_hdr *tcph;
             int tcph_len;
-            tcph = (struct tcp_hdr *)((char *)iph + iph_len);
+            tcph = (struct rte_tcp_hdr *)((char *)iph + iph_len);
             tcph_len = (tcph->data_off & 0xf0) >> 2;
             tcph->cksum = rte_ipv4_phdr_cksum(iph, PKT_TX_TCP_SEG);
 
@@ -1495,7 +1497,7 @@ ff_dpdk_if_send(struct ff_dpdk_if_context *ctx, void *m,
 
         if (offload.udp_csum) {
             head->ol_flags |= PKT_TX_UDP_CKSUM;
-            head->l2_len = ETHER_HDR_LEN;
+            head->l2_len = RTE_ETHER_HDR_LEN;
             head->l3_len = iph_len;
         }
     }

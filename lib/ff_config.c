@@ -569,6 +569,8 @@ ini_parse_handler(void* user, const char* section, const char* name,
         pconfig->dpdk.base_virtaddr= strdup(value);
     } else if (MATCH("dpdk", "port_list")) {
         return parse_port_list(pconfig, value);
+    } else if (MATCH("dpdk", "whitelist")) {
+        pconfig->dpdk.whitelist= strdup(value);
     } else if (MATCH("dpdk", "nb_vdev")) {
         pconfig->dpdk.nb_vdev = atoi(value);
     } else if (MATCH("dpdk", "nb_bond")) {
@@ -648,6 +650,10 @@ dpdk_args_setup(struct ff_config *cfg)
     }
     if (cfg->dpdk.base_virtaddr) {
         sprintf(temp, "--base-virtaddr=%s", cfg->dpdk.base_virtaddr);
+        dpdk_argv[n++] = strdup(temp);
+    }
+    if (cfg->dpdk.whitelist) {
+        sprintf(temp, "-w %s", cfg->dpdk.whitelist);
         dpdk_argv[n++] = strdup(temp);
     }
 

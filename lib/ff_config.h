@@ -112,6 +112,8 @@ struct ff_config {
         /* specify base virtual address to map. */
         char *base_virtaddr;
 
+        char *whitelist;
+
         int nb_channel;
         int memory;
         int no_huge;

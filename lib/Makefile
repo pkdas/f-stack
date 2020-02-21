@@ -23,7 +23,7 @@ F-STACK_VERSION=1.20
 
 HOST_OS:=$(shell uname -s)
 
-#DEBUG=-O0 -gdwarf-2 -g3 -Wno-format-truncation
+DEBUG=-O0 -gdwarf-2 -g3 -Wno-format-truncation
 
 FF_KNI=1
 #FF_NETGRAPH=1

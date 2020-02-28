@@ -113,6 +113,7 @@ struct ff_config {
         char *base_virtaddr;
 
         char *whitelist;
+        char *memif;
 
         int nb_channel;
         int memory;

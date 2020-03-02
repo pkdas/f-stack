@@ -191,8 +191,7 @@ main(int argc, char **argv)
 #ifndef FSTACK
 	while ((ch = getopt(argc, argv, "46nqdtv")) != -1)
 #else
-	ff_ipc_init();
-	while ((ch = getopt(argc, argv, "46nqdtvp:")) != -1)
+	while ((ch = getopt(argc, argv, "46nqdtvp:c:")) != -1)
 #endif
 		switch(ch) {
 		case '4':
@@ -230,6 +229,9 @@ main(int argc, char **argv)
 		case 'p':
 			ff_set_proc_id(atoi(optarg));
 			break;
+		case 'c':
+			ff_set_lcore_mask(atoi(optarg));
+			break;
 #endif
 		case '?':
 		default:
@@ -237,6 +239,7 @@ main(int argc, char **argv)
 		}
 	argc -= optind;
 	argv += optind;
+	ff_ipc_init();
 
 	pid = getpid();
 	uid = geteuid();

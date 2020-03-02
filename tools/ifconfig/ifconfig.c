@@ -426,10 +426,6 @@ main(int argc, char *argv[])
 	struct option *p;
 	size_t iflen;
 
-#ifdef FSTACK
-	ff_ipc_init();
-#endif
-
 	all = downonly = uponly = namesonly = noload = verbose = 0;
 	f_inet = f_inet6 = f_ether = f_addr = NULL;
 
@@ -447,7 +443,7 @@ main(int argc, char *argv[])
 #ifndef FSTACK
 	strlcpy(options, "f:adklmnuv", sizeof(options));
 #else
-	strlcpy(options, "p:f:adklmnuv", sizeof(options));
+	strlcpy(options, "p:c:f:adklmnuv", sizeof(options));
 #endif
 	for (p = opts; p != NULL; p = p->next)
 		strlcat(options, p->opt, sizeof(options));
@@ -456,6 +452,9 @@ main(int argc, char *argv[])
 #ifdef FSTACK
 		case 'p':
 			ff_set_proc_id(atoi(optarg));
+			break;
+		case 'c':
+			ff_set_lcore_mask(atoi(optarg));
 			break;
 #endif
 		case 'a':	/* scan all interfaces */
@@ -500,6 +499,11 @@ main(int argc, char *argv[])
 	}
 	argc -= optind;
 	argv += optind;
+
+#ifdef FSTACK
+	ff_ipc_init();
+#endif
+
 
 	/* -l cannot be used with -a or -m */
 	if (namesonly && (all || supmedia))

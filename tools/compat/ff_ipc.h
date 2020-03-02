@@ -31,6 +31,7 @@
 
 /* Set F-Stack proccess id to communicate with */
 void ff_set_proc_id(int pid);
+void ff_set_lcore_mask(int lcore_mask);
 
 int ff_ipc_init(void);
 struct ff_msg *ff_ipc_msg_alloc(void);

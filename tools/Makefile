@@ -1,5 +1,5 @@
 SUBDIRS=compat libutil libmemstat libxo libnetgraph sysctl ifconfig route top netstat ngctl ipfw arp traffic
-PREFIX_BIN=/usr/local/bin
+PREFIX_BIN=${DESTDIR}/usr/local/bin
 
 all:
 	for d in $(SUBDIRS); do ( cd $$d; $(MAKE) all ) ; done

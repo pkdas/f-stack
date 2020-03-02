@@ -40,6 +40,7 @@ static int inited;
 static struct rte_mempool *message_pool;
 
 uint16_t ff_proc_id = 0;
+int ff_lcore_mask=1;
 
 void
 ff_set_proc_id(int pid)
@@ -51,6 +52,12 @@ ff_set_proc_id(int pid)
     ff_proc_id = pid;
 }
 
+void
+ff_set_lcore_mask(int lcore_mask)
+{
+    ff_lcore_mask = lcore_mask;
+}
+
 int
 ff_ipc_init(void)
 {
@@ -58,12 +65,18 @@ ff_ipc_init(void)
         return 0;
     }
 
+    char lcore_mask[16];
     char *dpdk_argv[] = {
         "ff-ipc", "-c1", "-n4",
         "--proc-type=secondary",
         /* RTE_LOG_WARNING */
         "--log-level=5",
+        "-w 0000:00:09.0",
+        "--vdev=net_memif0,socket=/opt/host/run/memif.sock,role=slave,id=0"
     };
+
+    sprintf(lcore_mask, "-c%d", ff_lcore_mask);
+    dpdk_argv[1]=lcore_mask;
 
     int ret = rte_eal_init(sizeof(dpdk_argv)/sizeof(dpdk_argv[0]), dpdk_argv);
     if (ret < 0) {

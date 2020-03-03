@@ -266,15 +266,20 @@ init_lcore_conf(void)
         if (queueid < 0) {
             continue;
         }
-        printf("lcore: %u, port: %u, queue: %u\n", lcore_id, port_id, queueid);
-        uint16_t nb_rx_queue = lcore_conf.nb_rx_queue;
-        lcore_conf.rx_queue_list[nb_rx_queue].port_id = port_id;
-        lcore_conf.rx_queue_list[nb_rx_queue].queue_id = queueid;
-        lcore_conf.nb_rx_queue++;
 
-        lcore_conf.tx_queue_id[port_id] = queueid;
-        lcore_conf.tx_port_id[lcore_conf.nb_tx_port] = port_id;
-        lcore_conf.nb_tx_port++;
+        /* rx only on memif/vdev interface */
+        if (pconf->net_memif) {
+            uint16_t nb_rx_queue = lcore_conf.nb_rx_queue;
+            lcore_conf.rx_queue_list[nb_rx_queue].port_id = port_id;
+            lcore_conf.rx_queue_list[nb_rx_queue].queue_id = queueid;
+            lcore_conf.nb_rx_queue++;
+            printf("lcore: %u, port: %u, queue: %u rx-only\n", lcore_id, port_id, queueid);
+        } else {
+            lcore_conf.tx_queue_id[port_id] = queueid;
+            lcore_conf.tx_port_id[lcore_conf.nb_tx_port] = port_id;
+            lcore_conf.nb_tx_port++;
+            printf("lcore: %u, port: %u, queue: %u tx-only\n", lcore_id, port_id, queueid);
+        }
 
         lcore_conf.pcap[port_id] = pconf->pcap;
         lcore_conf.nb_queue_list[port_id] = pconf->nb_lcores;
@@ -528,6 +533,7 @@ set_rss_table(uint16_t port_id, uint16_t reta_size, uint16_t nb_queues)
     }
 }
 
+#define NET_MEMIF_DRIVER "net_memif"
 static int
 init_port_start(void)
 {
@@ -555,7 +561,7 @@ init_port_start(void)
             struct rte_eth_conf port_conf = {0};
             struct rte_eth_rxconf rxq_conf;
             struct rte_eth_txconf txq_conf;
-
+ 
             rte_eth_dev_info_get(port_id, &dev_info);
 
             if (nb_queues > dev_info.max_rx_queues) {
@@ -830,6 +836,19 @@ ff_dpdk_init(int argc, char **argv)
     idle_sleep = ff_global_cfg.dpdk.idle_sleep;
     pkt_tx_delay = ff_global_cfg.dpdk.pkt_tx_delay > BURST_TX_DRAIN_US ? \
         BURST_TX_DRAIN_US : ff_global_cfg.dpdk.pkt_tx_delay;
+
+    int j;
+    for (j = 0; j < ff_global_cfg.dpdk.nb_ports; ++j) {
+        uint16_t port_id = ff_global_cfg.dpdk.portid_list[j];
+        struct ff_port_cfg *pconf = &ff_global_cfg.dpdk.port_cfgs[port_id];
+        struct rte_eth_dev_info dev_info = {0};
+        rte_eth_dev_info_get(port_id, &dev_info);
+        if (!strcmp(dev_info.driver_name, NET_MEMIF_DRIVER)) {
+            pconf->net_memif=1;
+        } else {
+            pconf->net_memif=0;
+        }
+    }
 
     init_lcore_conf();
 
@@ -1640,6 +1659,7 @@ main_loop(void *arg)
 
 int
 ff_dpdk_if_up(void) {
+#if 0
     int i;
     struct lcore_conf *qconf = &lcore_conf;
     for (i = 0; i < qconf->nb_tx_port; i++) {
@@ -1649,6 +1669,20 @@ ff_dpdk_if_up(void) {
         veth_ctx[port_id] = ff_veth_attach(pconf);
         if (veth_ctx[port_id] == NULL) {
             rte_exit(EXIT_FAILURE, "ff_veth_attach failed");
+        }
+    }
+#endif
+    int j;
+    for (j = 0; j < ff_global_cfg.dpdk.nb_ports; ++j) {
+        uint16_t port_id = ff_global_cfg.dpdk.portid_list[j];
+        struct ff_port_cfg *pconf = &ff_global_cfg.dpdk.port_cfgs[port_id];
+
+        if (pconf->net_memif) {
+            veth_ctx[port_id] = ff_veth_attach(pconf);
+            if (veth_ctx[port_id] == NULL) {
+                rte_exit(EXIT_FAILURE, "ff_veth_attach failed");
+            }
+            printf("ff_veth_attach port id %u\n", port_id); 
         }
     }
 

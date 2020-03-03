@@ -274,12 +274,12 @@ init_lcore_conf(void)
             lcore_conf.rx_queue_list[nb_rx_queue].queue_id = queueid;
             lcore_conf.nb_rx_queue++;
             printf("lcore: %u, port: %u, queue: %u rx-only\n", lcore_id, port_id, queueid);
-        } else {
-            lcore_conf.tx_queue_id[port_id] = queueid;
-            lcore_conf.tx_port_id[lcore_conf.nb_tx_port] = port_id;
-            lcore_conf.nb_tx_port++;
-            printf("lcore: %u, port: %u, queue: %u tx-only\n", lcore_id, port_id, queueid);
-        }
+        } 
+
+        lcore_conf.tx_queue_id[port_id] = queueid;
+        lcore_conf.tx_port_id[lcore_conf.nb_tx_port] = port_id;
+        lcore_conf.nb_tx_port++;
+        printf("lcore: %u, port: %u, queue: %u tx-only\n", lcore_id, port_id, queueid);
 
         lcore_conf.pcap[port_id] = pconf->pcap;
         lcore_conf.nb_queue_list[port_id] = pconf->nb_lcores;

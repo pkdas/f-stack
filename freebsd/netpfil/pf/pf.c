@@ -1,3 +1,4 @@
+======================
 /*-
  * Copyright (c) 2001 Daniel Hartmeier
  * Copyright (c) 2002 - 2008 Henning Brauer
@@ -5313,8 +5314,9 @@ pf_routable_oldmpath(struct pf_addr *addr, sa_family_t af, struct pfi_kif *kif,
 			rt = (struct rtentry *)rn;
 			ifp = rt->rt_ifp;
 
-			if (kif->pfik_ifp == ifp)
-				ret = 1;
+			// PK FIXME
+			//if (kif->pfik_ifp == ifp)
+		        //		ret = 1;
 			rn = rn_mpath_next(rn);
 		} while (check_mpath == 1 && rn != NULL && ret == 0);
 	} else
@@ -5386,8 +5388,9 @@ pf_routable(struct pf_addr *addr, sa_family_t af, struct pfi_kif *kif,
 		return (0);
 
 	/* Perform uRPF check if passed input interface */
-	if (kif->pfik_ifp == ifp)
-		return (1);
+        // PK FIXME
+	//if (kif->pfik_ifp == ifp)
+	//	return (1);
 	return (0);
 }
 

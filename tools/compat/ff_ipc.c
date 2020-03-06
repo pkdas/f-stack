@@ -71,7 +71,7 @@ ff_ipc_init(void)
         "--proc-type=secondary",
         /* RTE_LOG_WARNING */
         "--log-level=5",
-        "-w 0000:00:09.0",
+        "-w 0000:00:07.0",
         "--vdev=net_memif0,socket=/opt/host/run/memif.sock,role=slave,id=0"
     };
 

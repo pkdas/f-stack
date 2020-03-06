@@ -53,6 +53,11 @@
 #include <rte_tcp.h>
 #include <rte_udp.h>
 #include <rte_eth_bond.h>
+#include <arpa/inet.h>
+#include <net/ethernet.h>
+#include <rte_config.h>
+#include <rte_mbuf_core.h>
+
 
 #include "ff_dpdk_if.h"
 #include "ff_dpdk_pcap.h"
@@ -267,14 +272,11 @@ init_lcore_conf(void)
             continue;
         }
 
-        /* rx only on memif/vdev interface */
-        if (pconf->net_memif) {
-            uint16_t nb_rx_queue = lcore_conf.nb_rx_queue;
-            lcore_conf.rx_queue_list[nb_rx_queue].port_id = port_id;
-            lcore_conf.rx_queue_list[nb_rx_queue].queue_id = queueid;
-            lcore_conf.nb_rx_queue++;
-            printf("lcore: %u, port: %u, queue: %u rx-only\n", lcore_id, port_id, queueid);
-        } 
+        uint16_t nb_rx_queue = lcore_conf.nb_rx_queue;
+        lcore_conf.rx_queue_list[nb_rx_queue].port_id = port_id;
+        lcore_conf.rx_queue_list[nb_rx_queue].queue_id = queueid;
+        lcore_conf.nb_rx_queue++;
+        printf("lcore: %u, port: %u, queue: %u rx-only\n", lcore_id, port_id, queueid);
 
         lcore_conf.tx_queue_id[port_id] = queueid;
         lcore_conf.tx_port_id[lcore_conf.nb_tx_port] = port_id;
@@ -533,7 +535,6 @@ set_rss_table(uint16_t port_id, uint16_t reta_size, uint16_t nb_queues)
     }
 }
 
-#define NET_MEMIF_DRIVER "net_memif"
 static int
 init_port_start(void)
 {
@@ -644,16 +645,21 @@ init_port_start(void)
 
             if (ff_global_cfg.dpdk.tx_csum_offoad_skip == 0) {
                 if ((dev_info.tx_offload_capa & DEV_TX_OFFLOAD_IPV4_CKSUM)) {
-                    printf("TX ip checksum offload supported\n");
+                    printf("TX ip checksum offload supported but disabling it\n");
                     port_conf.txmode.offloads |= DEV_TX_OFFLOAD_IPV4_CKSUM;
-                    pconf->hw_features.tx_csum_ip = 1;
+                    // PK FIXME - HW/NIC supports but does not update
+                    // may be have to enable on the DPDK port or VLAN header is causing to skip HW checsum
+                    pconf->hw_features.tx_csum_ip = 0;
                 }
 
                 if ((dev_info.tx_offload_capa & DEV_TX_OFFLOAD_UDP_CKSUM) &&
                     (dev_info.tx_offload_capa & DEV_TX_OFFLOAD_TCP_CKSUM)) {
                     printf("TX TCP&UDP checksum offload supported\n");
+                    printf("TX ip checksum offload supported but disabling it\n");
                     port_conf.txmode.offloads |= DEV_TX_OFFLOAD_UDP_CKSUM | DEV_TX_OFFLOAD_TCP_CKSUM;
-                    pconf->hw_features.tx_csum_l4 = 1;
+                    // PK FIXME - HW/NIC supports but does not update
+                    // may be have to enable on the DPDK port or VLAN header is causing to skip HW checsum
+                    pconf->hw_features.tx_csum_l4 = 0;
                 }
             } else {
                 printf("TX checksum offoad is disabled\n");
@@ -786,6 +792,28 @@ init_port_start(void)
             if (pconf->pcap) {
                 ff_enable_pcap(pconf->pcap);
             }
+
+            // PK - FIXME
+            int r, vlan_offload;
+
+            // first port is VF, set VLAN
+            if (port_id == 0) {
+                vlan_offload = rte_eth_dev_get_vlan_offload (port_id);
+                vlan_offload |= ETH_VLAN_FILTER_OFFLOAD;
+                if ((r = rte_eth_dev_set_vlan_offload(port_id, vlan_offload)))
+                {
+                    printf("rte_eth_dev_set_vlan_offload failed port %d vlan_offload %d r %d\n", port_id, vlan_offload, r);
+                } else {
+                    printf("rte_eth_dev_set_vlan_offload success port %d vlan_offload %d r %d\n", port_id, vlan_offload, r);
+                }
+
+                if ((r = rte_eth_dev_vlan_filter(port_id, 1528, 1)))
+                {
+                    printf("rte_eth_dev_set_vlan_filter failed port %d r %d\n", port_id, r);
+                } else {
+                    printf("rte_eth_dev_set_vlan_filter success port %d r %d\n", port_id, r);
+                }
+            }
         }
     }
 
@@ -843,11 +871,12 @@ ff_dpdk_init(int argc, char **argv)
         struct ff_port_cfg *pconf = &ff_global_cfg.dpdk.port_cfgs[port_id];
         struct rte_eth_dev_info dev_info = {0};
         rte_eth_dev_info_get(port_id, &dev_info);
-        if (!strcmp(dev_info.driver_name, NET_MEMIF_DRIVER)) {
-            pconf->net_memif=1;
-        } else {
-            pconf->net_memif=0;
-        }
+        // PK - FIXME
+        //if (!strcmp(dev_info.driver_name, NET_MEMIF_DRIVER)) {
+        //    pconf->net_memif=1;
+        //} else {
+        //    pconf->net_memif=0;
+        //}
     }
 
     init_lcore_conf();
@@ -899,9 +928,11 @@ ff_veth_input(const struct ff_dpdk_if_context *ctx, struct rte_mbuf *pkt)
         return;
     }
 
+    /* PK FIXME
     if (pkt->ol_flags & PKT_RX_VLAN_STRIPPED) {
         ff_mbuf_set_vlan_info(hdr, pkt->vlan_tci);
     }
+    */
 
     struct rte_mbuf *pn = pkt->next;
     void *prev = hdr;
@@ -1341,8 +1372,10 @@ static inline int
 send_burst(struct lcore_conf *qconf, uint16_t n, uint8_t port)
 {
     struct rte_mbuf **m_table;
+    const struct rte_mbuf *mb;
     int ret;
     uint16_t queueid;
+    uint16_t i;
 
     queueid = qconf->tx_queue_id[port];
     m_table = (struct rte_mbuf **)qconf->tx_mbufs[port].m_table;
@@ -1354,9 +1387,14 @@ send_burst(struct lcore_conf *qconf, uint16_t n, uint8_t port)
         }
     }
     
+    printf("transmitting on port %d count %d\n", port, n);
+
     ret = rte_eth_tx_burst(port, queueid, m_table, n);
+    if (unlikely(ret < n)) {
+        printf("transmit error on port %d count %d success %d\n", port, n, ret);
+    }
+
     ff_traffic.tx_packets += ret;
-    uint16_t i;
     for (i = 0; i < ret; i++) {
         ff_traffic.tx_bytes += rte_pktmbuf_pkt_len(m_table[i]);
 #ifdef FF_USE_PAGE_ARRAY
@@ -1402,6 +1440,7 @@ int
 ff_dpdk_if_send(struct ff_dpdk_if_context *ctx, void *m,
     int total)
 {
+
 #ifdef FF_USE_PAGE_ARRAY
     struct lcore_conf *qconf = &lcore_conf;
     int    len = 0;
@@ -1473,6 +1512,21 @@ ff_dpdk_if_send(struct ff_dpdk_if_context *ctx, void *m,
         head->ol_flags |= PKT_TX_IP_CKSUM | PKT_TX_IPV4;
         head->l2_len = RTE_ETHER_HDR_LEN;
         head->l3_len = iph_len;
+    }
+
+    // PK FIXME 
+    // set VLAN on transmit on VF port 0
+    if (ctx->port_id == 0) {
+        // ADD VLAN Header
+        data = rte_pktmbuf_prepend(head, sizeof(struct rte_vlan_hdr));
+        if (data != NULL) {
+            memmove(data, data + sizeof(struct rte_vlan_hdr), RTE_ETHER_HDR_LEN);
+            struct rte_ether_hdr *etherhdr = (struct rte_ether_hdr *)data;
+            struct rte_vlan_hdr *vlanhdr = (struct rte_vlan_hdr *)(data + RTE_ETHER_HDR_LEN);
+            vlanhdr->vlan_tci = rte_cpu_to_be_16(1528);
+            vlanhdr->eth_proto = etherhdr->ether_type;
+            etherhdr->ether_type = rte_cpu_to_be_16(RTE_ETHER_TYPE_VLAN);
+        }
     }
 
     if (ctx->hw_features.tx_csum_l4) {
@@ -1677,13 +1731,11 @@ ff_dpdk_if_up(void) {
         uint16_t port_id = ff_global_cfg.dpdk.portid_list[j];
         struct ff_port_cfg *pconf = &ff_global_cfg.dpdk.port_cfgs[port_id];
 
-        if (pconf->net_memif) {
-            veth_ctx[port_id] = ff_veth_attach(pconf);
-            if (veth_ctx[port_id] == NULL) {
-                rte_exit(EXIT_FAILURE, "ff_veth_attach failed");
-            }
-            printf("ff_veth_attach port id %u\n", port_id); 
+        veth_ctx[port_id] = ff_veth_attach(pconf);
+        if (veth_ctx[port_id] == NULL) {
+            rte_exit(EXIT_FAILURE, "ff_veth_attach failed");
         }
+        printf("ff_veth_attach port id %u\n", port_id); 
     }
 
     return 0;

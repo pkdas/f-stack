@@ -568,6 +568,11 @@ tooshort:
 			return;
 #endif /* IPSEC */
 
+        // PK FIXME
+	if (ip->ip_p==IPPROTO_TCP) {
+	    goto ours;
+        }
+
 	/*
 	 * Run through list of hooks for input packets.
 	 *

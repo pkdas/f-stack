@@ -15,7 +15,7 @@ LIBS+= -Wl,--no-whole-archive -lrt -lm -ldl -lcrypto -pthread -lnuma
 TARGET="helloworld"
 all:
 	cc -O0 -gdwarf-2  -g3 -Wno-format-truncation -I../lib -o ${TARGET} main.c ${LIBS}
-	cc -O0 -gdwarf-2 -g3 -Wno-format-truncation  -I../lib -o ${TARGET}_epoll main_epoll.c ${LIBS}
+	cc -O0 -gdwarf-2 -g3 -Wno-format-truncation  -I../lib -I../freebsd/netinet -o ${TARGET}_epoll main_epoll.c ${LIBS}
 	cc -O0 -gdwarf-2 -g3 -Wno-format-truncation  -I../lib -o udp_epoll udp_epoll.c ${LIBS}
 
 .PHONY: clean

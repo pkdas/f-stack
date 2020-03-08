@@ -797,7 +797,7 @@ init_port_start(void)
             int r, vlan_offload;
 
             // first port is VF, set VLAN
-            if (port_id == 0) {
+            if ((port_id == 0) && pconf->vlan) {
                 vlan_offload = rte_eth_dev_get_vlan_offload (port_id);
                 vlan_offload |= ETH_VLAN_FILTER_OFFLOAD;
                 if ((r = rte_eth_dev_set_vlan_offload(port_id, vlan_offload)))
@@ -807,7 +807,7 @@ init_port_start(void)
                     printf("rte_eth_dev_set_vlan_offload success port %d vlan_offload %d r %d\n", port_id, vlan_offload, r);
                 }
 
-                if ((r = rte_eth_dev_vlan_filter(port_id, 1528, 1)))
+                if ((r = rte_eth_dev_vlan_filter(port_id, pconf->vlan, 1)))
                 {
                     printf("rte_eth_dev_set_vlan_filter failed port %d r %d\n", port_id, r);
                 } else {
@@ -1453,6 +1453,7 @@ ff_dpdk_if_send(struct ff_dpdk_if_context *ctx, void *m,
     qconf->tx_mbufs[ctx->port_id].len = len;
     return 0;
 #endif
+    struct ff_port_cfg *pconf = &lcore_conf.port_cfgs[ctx->port_id];
     struct rte_mempool *mbuf_pool = pktmbuf_pool[lcore_conf.socket_id];
     struct rte_mbuf *head = rte_pktmbuf_alloc(mbuf_pool);
     if (head == NULL) {
@@ -1516,14 +1517,14 @@ ff_dpdk_if_send(struct ff_dpdk_if_context *ctx, void *m,
 
     // PK FIXME 
     // set VLAN on transmit on VF port 0
-    if (ctx->port_id == 0) {
+    if (pconf->vlan && (ctx->port_id == 0)) {
         // ADD VLAN Header
         data = rte_pktmbuf_prepend(head, sizeof(struct rte_vlan_hdr));
         if (data != NULL) {
             memmove(data, data + sizeof(struct rte_vlan_hdr), RTE_ETHER_HDR_LEN);
             struct rte_ether_hdr *etherhdr = (struct rte_ether_hdr *)data;
             struct rte_vlan_hdr *vlanhdr = (struct rte_vlan_hdr *)(data + RTE_ETHER_HDR_LEN);
-            vlanhdr->vlan_tci = rte_cpu_to_be_16(1528);
+            vlanhdr->vlan_tci = rte_cpu_to_be_16(pconf->vlan);
             vlanhdr->eth_proto = etherhdr->ether_type;
             etherhdr->ether_type = rte_cpu_to_be_16(RTE_ETHER_TYPE_VLAN);
         }

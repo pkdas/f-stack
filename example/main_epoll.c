@@ -10,9 +10,13 @@
 #include <errno.h>
 #include <assert.h>
 
+#define    IP_BINDANY              24
+// #include "in.h" IP_BINDANY 24
 #include "ff_config.h"
 #include "ff_api.h"
 #include "ff_epoll.h"
+
+#define  IP_ADDR_MINE 0x03030303
 
 
 #define MAX_EVENTS 512
@@ -120,6 +124,11 @@ int main(int argc, char * argv[])
     my_addr.sin_family = AF_INET;
     my_addr.sin_port = htons(80);
     my_addr.sin_addr.s_addr = htonl(INADDR_ANY);
+    //my_addr.sin_port = 0;
+    //my_addr.sin_addr.s_addr = htonl(IP_ADDR_MINE);
+
+    int bindany=1;
+    ff_setsockopt(sockfd, IPPROTO_IP, IP_BINDANY, &bindany, sizeof(int));
 
     int ret = ff_bind(sockfd, (struct linux_sockaddr *)&my_addr, sizeof(my_addr));
     if (ret < 0) {

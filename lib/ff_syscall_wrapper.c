@@ -93,6 +93,7 @@
 #define LINUX_IP_MULTICAST_LOOP     34
 #define LINUX_IP_ADD_MEMBERSHIP     35
 #define LINUX_IP_DROP_MEMBERSHIP    36
+#define LINUX_IP_BINDANY            24
 
 #define LINUX_TCP_NODELAY     1
 #define LINUX_TCP_MAXSEG      2
@@ -353,6 +354,8 @@ ip_opt_convert(int optname)
             return IP_ADD_MEMBERSHIP;
         case LINUX_IP_DROP_MEMBERSHIP:
             return IP_DROP_MEMBERSHIP;
+        case LINUX_IP_BINDANY:
+            return IP_BINDANY;
         default:
             return -1;
     }

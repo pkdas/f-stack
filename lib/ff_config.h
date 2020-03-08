@@ -65,6 +65,7 @@ struct ff_port_cfg {
     int nb_slaves;
     uint16_t lcore_list[DPDK_MAX_LCORE];
     uint16_t *slave_portid_list;
+    int vlan;
 
     // rx on net_memif 1 and tx on net_memif 0 port
     int net_memif;

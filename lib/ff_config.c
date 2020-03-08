@@ -424,6 +424,8 @@ port_cfg_handler(struct ff_config *cfg, const char *section,
         cur->gateway = strdup(value);
     } else if (strcmp(name, "pcap") == 0) {
         cur->pcap = strdup(value);
+    } else if (strcmp(name, "vlan") == 0) {
+        cur->vlan = atoi(value);
     } else if (strcmp(name, "lcore_list") == 0) {
         return parse_port_lcore_list(cur, value);
     } else if (strcmp(name, "slave_port_list") == 0) {

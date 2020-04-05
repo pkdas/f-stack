@@ -60,15 +60,13 @@ struct ff_port_cfg {
     char *broadcast;
     char *gateway;
     char *pcap;
+    uint8_t pcap_enabled;
 
     int nb_lcores;
     int nb_slaves;
     uint16_t lcore_list[DPDK_MAX_LCORE];
     uint16_t *slave_portid_list;
     int vlan;
-
-    // rx on net_memif 1 and tx on net_memif 0 port
-    int net_memif;
 };
 
 struct ff_vdev_cfg {
@@ -96,6 +94,22 @@ struct ff_bond_cfg {
     uint16_t down_delay;
 };
 
+#ifdef AFFIRMED_USTCP
+/* --vdev='net_memif0,socket=/opt/host/run/memif.sock,role=slave,id=0' */
+struct ff_memif_cfg {
+    char *name; 
+    char *socket; 
+    char *role;
+    int id;
+    int zero_copy;
+    /* single packet buffer size */
+    int bsize; 
+    /* Log2 of ring size. If rsize is 10, actual ring size is 1024 */
+    int rsize; 
+    char *mac;
+};
+#endif
+
 struct ff_freebsd_cfg {
     char *name;
     char *str;
@@ -106,6 +120,7 @@ struct ff_freebsd_cfg {
 
 struct ff_config {
     char *filename;
+
     struct {
         char *proc_type;
         /* mask of enabled lcores */
@@ -116,8 +131,13 @@ struct ff_config {
         /* specify base virtual address to map. */
         char *base_virtaddr;
 
+        /* whitelist PCIe-addresses of PFs/VFs */
+        /* comman separated e.g. 0000:00:07.0, 0000:00:02.0 */
         char *whitelist;
-        char *memif;
+
+        /* blacklist PCIe-addresses of PFs/VFs */
+        /* comman separated e.g. 0000:00:07.0, 0000:00:02.0 */
+        char *blacklist;
 
         int nb_channel;
         int memory;
@@ -148,6 +168,13 @@ struct ff_config {
         struct ff_port_cfg *port_cfgs;
         struct ff_vdev_cfg *vdev_cfgs;
         struct ff_bond_cfg *bond_cfgs;
+
+#ifdef AFFIRMED_USTCP
+        /* number of memif interfaces */
+        int nb_memif;
+        struct ff_memif_cfg *memif_cfgs;
+#endif
+
     } dpdk;
 
     struct {
@@ -175,6 +202,7 @@ struct ff_config {
 extern struct ff_config ff_global_cfg;
 
 int ff_load_config(int argc, char * const argv[]);
+int ff_load_config_affirmed(void);
 
 #ifdef __cplusplus
 }

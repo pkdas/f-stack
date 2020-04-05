@@ -69,6 +69,8 @@ else
 HOST_CFLAGS = ${DEBUG} 
 endif
 
+HOST_CFLAGS+= -DAFFIRMED_USTCP
+
 ifdef FF_KNI
 HOST_CFLAGS+= -DFF_KNI
 endif

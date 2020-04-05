@@ -38,11 +38,18 @@
 
 #define DEFAULT_CONFIG_FILE   "config.ini"
 
+// PK FIXME
+#if 0 
+#ifdef AFFIRMED_USTCP
+#define AFFIRMED_USTCP_CONF "/boot/partitions/storage/user_space_tcp.conf"
+#endif
+#endif
+
 #define BITS_PER_HEX 4
 
-struct ff_config ff_global_cfg = {0};
-int dpdk_argc=0;
-char *dpdk_argv[DPDK_CONFIG_NUM + 1] = {0};
+struct ff_config ff_global_cfg;
+int dpdk_argc;
+char *dpdk_argv[DPDK_CONFIG_NUM + 1];
 
 char* const short_options = "c:t:p:";
 struct option long_options[] = {
@@ -435,6 +442,63 @@ port_cfg_handler(struct ff_config *cfg, const char *section,
     return 1;
 }
 
+#ifdef AFFIRMED_USTCP
+static int
+memif_cfg_handler(struct ff_config *cfg, const char *section,
+    const char *name, const char *value) {
+
+    if (cfg->dpdk.nb_memif == 0) {
+        fprintf(stderr, "memif_cfg_handler: must config dpdk.nb_memif first\n");
+        return 0;
+    }
+
+    int memifid;
+    int ret = sscanf(section, "net_memif%d", &memifid);
+    if (ret != 1) {
+        fprintf(stderr, "memif_cfg_handler section[%s] error\n", section);
+        return 0;
+    }
+
+    /* just return true if memifid >= nb_memif because it has no effect */
+    //if (memifid > cfg->dpdk.nb_memif) {
+    //    fprintf(stderr, "memif_cfg_handler section[%s] bigger than max memif id\n", section);
+    //    return 1;
+    //}
+
+    if (cfg->dpdk.memif_cfgs == NULL) {
+        struct ff_memif_cfg *mc = calloc(RTE_MAX_ETHPORTS, sizeof(struct ff_memif_cfg));
+        if (mc == NULL) {
+            fprintf(stderr, "memif_cfg_handler malloc failed\n");
+            return 0;
+        }
+        cfg->dpdk.memif_cfgs = mc;
+    }
+
+    struct ff_memif_cfg *cur = &cfg->dpdk.memif_cfgs[memifid];
+    if (cur->name == NULL) {
+        cur->name = strdup(section);
+        cur->id = memifid;
+    }
+
+    if (strcmp(name, "socket") == 0) {
+        cur->socket = strdup(value);
+    } else if (strcmp(name, "role") == 0) {
+        cur->role = strdup(value);
+    } else if (strcmp(name, "zero_copy") == 0) {
+        cur->zero_copy = atoi(value);
+    } else if (strcmp(name, "bsize") == 0) {
+        cur->bsize = atoi(value);
+    } else if (strcmp(name, "rsize") == 0) {
+        cur->rsize = atoi(value);
+    } else if (strcmp(name, "mac") == 0) {
+        cur->mac = strdup(value);
+    } 
+
+    return 1;
+}
+
+#endif
+
 static int
 vdev_cfg_handler(struct ff_config *cfg, const char *section,
     const char *name, const char *value) {
@@ -573,12 +637,14 @@ ini_parse_handler(void* user, const char* section, const char* name,
         return parse_port_list(pconfig, value);
     } else if (MATCH("dpdk", "whitelist")) {
         pconfig->dpdk.whitelist= strdup(value);
-    } else if (MATCH("dpdk", "memif")) {
-        pconfig->dpdk.memif= strdup(value);
+    } else if (MATCH("dpdk", "blacklist")) {
+        pconfig->dpdk.blacklist= strdup(value);
     } else if (MATCH("dpdk", "nb_vdev")) {
         pconfig->dpdk.nb_vdev = atoi(value);
     } else if (MATCH("dpdk", "nb_bond")) {
         pconfig->dpdk.nb_bond = atoi(value);
+    } else if (MATCH("dpdk", "nb_memif")) {
+        pconfig->dpdk.nb_memif = atoi(value);
     } else if (MATCH("dpdk", "promiscuous")) {
         pconfig->dpdk.promiscuous = atoi(value);
     } else if (MATCH("dpdk", "numa_on")) {
@@ -621,6 +687,10 @@ ini_parse_handler(void* user, const char* section, const char* name,
         return vdev_cfg_handler(pconfig, section, name, value);
     } else if (strncmp(section, "bond", 4) == 0) {
         return bond_cfg_handler(pconfig, section, name, value);
+#ifdef AFFIRMED_USTCP
+    } else if (strncmp(section, "net_memif", 9) == 0) {
+        return memif_cfg_handler(pconfig, section, name, value);
+#endif
     }
 
     return 1;
@@ -657,13 +727,44 @@ dpdk_args_setup(struct ff_config *cfg)
         dpdk_argv[n++] = strdup(temp);
     }
     if (cfg->dpdk.whitelist) {
-        sprintf(temp, "-w %s", cfg->dpdk.whitelist);
-        dpdk_argv[n++] = strdup(temp);
+        char *wl=cfg->dpdk.whitelist;
+        char *pcieaddr; 
+        /* note cfg->dpdk.whitelist is altered by strok - don't reuse */
+        while ((pcieaddr = strtok_r(wl, ",", &wl))) {
+            sprintf(temp, "-w %s", pcieaddr);
+            dpdk_argv[n++] = strdup(temp);
+        }
+    } else {
+        // whitelist and blacklist are mutually exclusive 
+        // blacklist is ignored if whitelist is specified
+        if (cfg->dpdk.blacklist) {
+            char *wl=cfg->dpdk.blacklist;
+            char *pcieaddr; 
+            /* note cfg->dpdk.blacklist is altered by strok - don't reuse */
+            while ((pcieaddr = strtok_r(wl, ",", &wl))) {
+                sprintf(temp, "-b %s", pcieaddr);
+                dpdk_argv[n++] = strdup(temp);
+            }
+
+        }
     }
-    if (cfg->dpdk.memif) {
-        sprintf(temp, "--vdev=%s", cfg->dpdk.memif);
-        dpdk_argv[n++] = strdup(temp);
+#ifdef AFFIRMED_USTCP
+    if (cfg->dpdk.nb_memif) {
+        for (i=0; i<RTE_MAX_ETHPORTS; i++) {
+            /* mandatory params */
+            /* --vdev=net_memif0,socket=/opt/host/run/memif.sock,role=slave,id=0 */
+            if (cfg->dpdk.memif_cfgs[i].name && cfg->dpdk.memif_cfgs[i].socket) {
+                sprintf(temp, "--vdev=%s,socket=%s,role=%s,id=%d", 
+                               cfg->dpdk.memif_cfgs[i].name,
+                               cfg->dpdk.memif_cfgs[i].socket,
+                               cfg->dpdk.memif_cfgs[i].role,
+                               cfg->dpdk.memif_cfgs[i].id);
+                /* optional params */
+                dpdk_argv[n++] = strdup(temp);
+            }
+        }
     }
+#endif
 
     if (cfg->dpdk.nb_vdev) {
         for (i=0; i<cfg->dpdk.nb_vdev; i++) {
@@ -876,6 +977,14 @@ ff_default_config(struct ff_config *cfg)
 {
     memset(cfg, 0, sizeof(struct ff_config));
 
+// PK FIXME
+#if 0
+#ifdef AFFIRMED_USTCP
+    cfg->filename = AFFIRMED_USTCP_CONF;
+#else
+    cfg->filename = DEFAULT_CONFIG_FILE;
+#endif
+#endif
     cfg->filename = DEFAULT_CONFIG_FILE;
 
     cfg->dpdk.proc_id = -1;
@@ -911,6 +1020,25 @@ ff_load_config(int argc, char *const argv[])
     }
 
     if (dpdk_args_setup(&ff_global_cfg) <= 0) {
+        return -1;
+    }
+
+    return 0;
+}
+
+int
+ff_load_config_affirmed(void)
+{
+    ff_default_config(&ff_global_cfg);
+
+    int ret = ini_parse(ff_global_cfg.filename, ini_parse_handler,
+        &ff_global_cfg);
+    if (ret != 0) {
+        printf("parse %s failed on line %d\n", ff_global_cfg.filename, ret);
+        return -1;
+    }
+
+    if (ff_check_config(&ff_global_cfg)) {
         return -1;
     }
 

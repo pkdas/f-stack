@@ -513,6 +513,9 @@ tvtohz(tv)
     register unsigned long ticks;
     register long sec, usec;
 
+    if (tick == 0) {
+        tick += 1;
+    }
     /*
      * If the number of usecs in the whole seconds part of the time
      * difference fits in a long, then the total number of usecs will

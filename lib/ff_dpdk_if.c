@@ -386,6 +386,8 @@ create_ring(const char *name, unsigned count, int socket_id, unsigned flags)
     return ring;
 }
 
+// PK FIXME
+#if 0 
 static int
 init_dispatch_ring(void)
 {
@@ -429,6 +431,8 @@ init_dispatch_ring(void)
 
     return 0;
 }
+
+#endif // PK FIXME 
 
 static void
 ff_msg_init(struct rte_mempool *mp,
@@ -684,9 +688,14 @@ init_port_start(void)
                     dev_info.reta_size);
             }
 
+            // PK FIXME
+            #if 0
             if (rte_eal_process_type() != RTE_PROC_PRIMARY) {
                 continue;
             }
+            #endif 
+
+            printf("rte_eth_dev_configure port id %d\n", port_id);
 
             int ret = rte_eth_dev_configure(port_id, nb_queues, nb_queues, &port_conf);
             if (ret != 0) {
@@ -883,7 +892,7 @@ ff_dpdk_init(int argc, char **argv)
 
     init_mem_pool();
 
-    init_dispatch_ring();
+    //init_dispatch_ring();
 
     init_msg_ring();
 
@@ -1172,6 +1181,8 @@ process_packets(uint16_t port_id, uint16_t queue_id, struct rte_mbuf **bufs,
     }
 }
 
+// PK FIXME
+#if 0
 static inline int
 process_dispatch_ring(uint16_t port_id, uint16_t queue_id,
     struct rte_mbuf **pkts_burst, const struct ff_dpdk_if_context *ctx)
@@ -1187,6 +1198,7 @@ process_dispatch_ring(uint16_t port_id, uint16_t queue_id,
 
     return 0;
 }
+#endif
 
 static inline void
 handle_sysctl_msg(struct ff_msg *msg)
@@ -1648,7 +1660,10 @@ main_loop(void *arg)
             }
 #endif
 
+// PK FIXME
+#if 0
             process_dispatch_ring(port_id, queue_id, pkts_burst, ctx);
+#endif
 
             nb_rx = rte_eth_rx_burst(port_id, queue_id, pkts_burst,
                 MAX_PKT_BURST);

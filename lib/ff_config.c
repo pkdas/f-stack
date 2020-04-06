@@ -47,9 +47,9 @@
 
 #define BITS_PER_HEX 4
 
-struct ff_config ff_global_cfg;
-int dpdk_argc;
-char *dpdk_argv[DPDK_CONFIG_NUM + 1];
+struct ff_config ff_global_cfg = {0};
+int dpdk_argc=0;
+char *dpdk_argv[DPDK_CONFIG_NUM + 1] = {0};
 
 char* const short_options = "c:t:p:";
 struct option long_options[] = {

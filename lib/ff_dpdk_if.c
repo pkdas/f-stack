@@ -272,6 +272,10 @@ init_lcore_conf(void)
             continue;
         }
 
+        //if (port_id != ff_global_cfg.dpdk.memifport) {
+        //    continue;
+        //}
+
         uint16_t nb_rx_queue = lcore_conf.nb_rx_queue;
         lcore_conf.rx_queue_list[nb_rx_queue].port_id = port_id;
         lcore_conf.rx_queue_list[nb_rx_queue].queue_id = queueid;
@@ -514,6 +518,9 @@ init_kni(void)
 }
 #endif
 
+
+// PK FIXME
+#if 0
 static void
 set_rss_table(uint16_t port_id, uint16_t reta_size, uint16_t nb_queues)
 {
@@ -539,6 +546,8 @@ set_rss_table(uint16_t port_id, uint16_t reta_size, uint16_t nb_queues)
     }
 }
 
+#endif
+
 static int
 init_port_start(void)
 {
@@ -551,6 +560,9 @@ init_port_start(void)
         uint16_t port_id, u_port_id = ff_global_cfg.dpdk.portid_list[i];
         struct ff_port_cfg *pconf = &ff_global_cfg.dpdk.port_cfgs[u_port_id];
         uint16_t nb_queues = pconf->nb_lcores;
+        // PK FIXME memif only
+        uint16_t nb_tx_queues=1;
+        uint16_t nb_rx_queues=1;
 
         for (j=0; j<=pconf->nb_slaves; j++) {
             if (j < pconf->nb_slaves) {
@@ -568,6 +580,7 @@ init_port_start(void)
             struct rte_eth_txconf txq_conf;
  
             rte_eth_dev_info_get(port_id, &dev_info);
+
 
             if (nb_queues > dev_info.max_rx_queues) {
                 rte_exit(EXIT_FAILURE, "num_procs[%d] bigger than max_rx_queues[%d]\n",
@@ -593,6 +606,8 @@ init_port_start(void)
             rte_memcpy(pconf->mac,
                 addr.addr_bytes, RTE_ETHER_ADDR_LEN);
 
+            // PK FIXME memif no RSS
+            #if 0 
             /* Set RSS mode */
             uint64_t default_rss_hf = ETH_RSS_PROTO_MASK;
             port_conf.rxmode.mq_mode = ETH_MQ_RX_RSS;
@@ -613,6 +628,7 @@ init_port_start(void)
                         port_id, default_rss_hf,
                         port_conf.rx_adv_conf.rss_conf.rss_hf);
             }
+            #endif
 
             if (dev_info.tx_offload_capa & DEV_TX_OFFLOAD_MBUF_FAST_FREE) {
                 port_conf.txmode.offloads |=
@@ -688,19 +704,17 @@ init_port_start(void)
                     dev_info.reta_size);
             }
 
-            // PK FIXME
-            #if 0
             if (rte_eal_process_type() != RTE_PROC_PRIMARY) {
                 continue;
             }
-            #endif 
 
             printf("rte_eth_dev_configure port id %d\n", port_id);
 
-            int ret = rte_eth_dev_configure(port_id, nb_queues, nb_queues, &port_conf);
+            int ret = rte_eth_dev_configure(port_id, nb_rx_queues, nb_tx_queues, &port_conf);
             if (ret != 0) {
                 return ret;
             }
+            printf("rte_eth_dev_configure port id %d success\n", port_id);
 
             static uint16_t nb_rxd = RX_QUEUE_SIZE;
             static uint16_t nb_txd = TX_QUEUE_SIZE;
@@ -712,9 +726,12 @@ init_port_start(void)
             uint16_t q;
             for (q = 0; q < nb_queues; q++) {
                 if (numa_on) {
-                    uint16_t lcore_id = lcore_conf.port_cfgs[port_id].lcore_list[q];
+                    // PK FIXME 
+                    //uint16_t lcore_id = lcore_conf.port_cfgs[port_id].lcore_list[q];
+                    uint16_t lcore_id = lcore_conf.port_cfgs[port_id].lcore_list[0];
                     socketid = rte_lcore_to_socket_id(lcore_id);
                 }
+                
                 mbuf_pool = pktmbuf_pool[socketid];
 
                 txq_conf = dev_info.default_txconf;
@@ -768,7 +785,10 @@ init_port_start(void)
             if (ret < 0) {
                 return ret;
             }
+            printf("rte_eth_dev_start port id %d success\n", port_id);
 
+            // PK FIXME 
+            #if 0
             if (nb_queues > 1) {
                 /* set HW rss hash function to Toeplitz. */
                 if (!rte_eth_dev_filter_supported(port_id, RTE_ETH_FILTER_HASH)) {
@@ -796,6 +816,7 @@ init_port_start(void)
                     printf("set port %u to promiscuous mode error\n", port_id);
                 }
             }
+            #endif
 
             /* Enable pcap dump */
             if (pconf->pcap) {
@@ -826,9 +847,12 @@ init_port_start(void)
         }
     }
 
+#if 0
     if (rte_eal_process_type() == RTE_PROC_PRIMARY) {
         check_all_ports_link_status();
     }
+#endif
+    check_all_ports_link_status();
 
     return 0;
 }
@@ -879,7 +903,9 @@ ff_dpdk_init(int argc, char **argv)
         uint16_t port_id = ff_global_cfg.dpdk.portid_list[j];
         struct ff_port_cfg *pconf = &ff_global_cfg.dpdk.port_cfgs[port_id];
         struct rte_eth_dev_info dev_info = {0};
-        rte_eth_dev_info_get(port_id, &dev_info);
+        if (rte_eth_dev_info_get(port_id, &dev_info) != 0) {
+           printf("rte_eth_dev_info_get error port %d\n", port_id);
+        }
         // PK - FIXME
         //if (!strcmp(dev_info.driver_name, NET_MEMIF_DRIVER)) {
         //    pconf->net_memif=1;
@@ -1399,11 +1425,11 @@ send_burst(struct lcore_conf *qconf, uint16_t n, uint8_t port)
         }
     }
     
-    printf("transmitting on port %d count %d\n", port, n);
+    printf("transmitting on port %d queueid %d count %d\n", port, queueid, n);
 
     ret = rte_eth_tx_burst(port, queueid, m_table, n);
     if (unlikely(ret < n)) {
-        printf("transmit error on port %d count %d success %d\n", port, n, ret);
+        printf("transmit error on port %d count %d ret %d\n", port, n, ret);
     }
 
     ff_traffic.tx_packets += ret;
@@ -1745,6 +1771,9 @@ ff_dpdk_if_up(void) {
     int j;
     for (j = 0; j < ff_global_cfg.dpdk.nb_ports; ++j) {
         uint16_t port_id = ff_global_cfg.dpdk.portid_list[j];
+        if (port_id != ff_global_cfg.dpdk.memifport) {
+            continue;
+        }
         struct ff_port_cfg *pconf = &ff_global_cfg.dpdk.port_cfgs[port_id];
 
         veth_ctx[port_id] = ff_veth_attach(pconf);

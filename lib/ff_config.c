@@ -641,6 +641,8 @@ ini_parse_handler(void* user, const char* section, const char* name,
         pconfig->dpdk.blacklist= strdup(value);
     } else if (MATCH("dpdk", "nb_vdev")) {
         pconfig->dpdk.nb_vdev = atoi(value);
+    } else if (MATCH("dpdk", "memifport")) {
+        pconfig->dpdk.memifport = atoi(value);
     } else if (MATCH("dpdk", "nb_bond")) {
         pconfig->dpdk.nb_bond = atoi(value);
     } else if (MATCH("dpdk", "nb_memif")) {

@@ -31,9 +31,14 @@
 
 extern int memif_logtype;
 
+#if 0
 #define MIF_LOG(level, fmt, args...) \
 	rte_log(RTE_LOG_ ## level, memif_logtype, \
 		"%s(): " fmt "\n", __func__, ##args)
+
+#endif
+#define MIF_LOG(level, fmt, args...) \
+	printf("%s(): " fmt "\n", __func__, ##args)
 
 enum memif_role_t {
 	MEMIF_ROLE_MASTER,

@@ -67,7 +67,7 @@ ff_ipc_init(void)
 
     char lcore_mask[16];
     char *dpdk_argv[] = {
-        "ff-ipc", "-c1", "-n4",
+        "ff-ipc", "-c80", "-n4",
         "--proc-type=secondary",
         /* RTE_LOG_WARNING */
         "--log-level=5",

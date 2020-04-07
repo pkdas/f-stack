@@ -545,8 +545,10 @@ eth_memif_tx(void *queue, struct rte_mbuf **bufs, uint16_t nb_pkts)
 	ssize_t size;
 	struct rte_eth_link link;
 
-	if (unlikely((pmd->flags & ETH_MEMIF_FLAG_CONNECTED) == 0))
+	if (unlikely((pmd->flags & ETH_MEMIF_FLAG_CONNECTED) == 0)) {
+		MIF_LOG(ERR, "memif flag not connected port %u", mq->in_port);
 		return 0;
+        }
 	if (unlikely(ring == NULL)) {
 		int ret;
 

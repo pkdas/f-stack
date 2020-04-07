@@ -174,6 +174,7 @@ struct ff_config {
         int nb_memif;
         struct ff_memif_cfg *memif_cfgs;
 #endif
+        int  memifport;
 
     } dpdk;
 

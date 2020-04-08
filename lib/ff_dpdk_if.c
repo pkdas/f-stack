@@ -272,9 +272,10 @@ init_lcore_conf(void)
             continue;
         }
 
-        //if (port_id != ff_global_cfg.dpdk.memifport) {
-        //    continue;
-        //}
+        if ((rte_eal_process_type() != RTE_PROC_PRIMARY) && 
+            (port_id != ff_global_cfg.dpdk.memifport)) {
+            continue;
+        } 
 
         uint16_t nb_rx_queue = lcore_conf.nb_rx_queue;
         lcore_conf.rx_queue_list[nb_rx_queue].port_id = port_id;
@@ -1658,8 +1659,15 @@ main_loop(void *arg)
         if (unlikely(diff_tsc >= drain_tsc)) {
             for (i = 0; i < qconf->nb_tx_port; i++) {
                 port_id = qconf->tx_port_id[i];
+        
                 if (qconf->tx_mbufs[port_id].len == 0)
                     continue;
+
+                // this is an error PK FIXME
+                if (port_id != ff_global_cfg.dpdk.memifport) {
+                    printf("filtering tx on port %d\n", port_id);
+                    continue;
+                }
 
                 idle = 0;
 
@@ -1690,6 +1698,10 @@ main_loop(void *arg)
 #if 0
             process_dispatch_ring(port_id, queue_id, pkts_burst, ctx);
 #endif
+            // rx polling only the queues of the memifport PK FIXME
+            if (port_id != ff_global_cfg.dpdk.memifport) {
+                continue;
+            }
 
             nb_rx = rte_eth_rx_burst(port_id, queue_id, pkts_burst,
                 MAX_PKT_BURST);

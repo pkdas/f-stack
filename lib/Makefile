@@ -28,7 +28,7 @@ DEBUG=-O0 -gdwarf-2 -g3 -Wno-format-truncation
 FF_KNI=1
 #FF_NETGRAPH=1
 #FF_IPFW=1
-#FF_USE_PAGE_ARRAY=1
+FF_USE_PAGE_ARRAY=1
 FF_INET6=1
 
 

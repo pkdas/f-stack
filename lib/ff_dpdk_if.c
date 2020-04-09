@@ -1426,7 +1426,7 @@ send_burst(struct lcore_conf *qconf, uint16_t n, uint8_t port)
         }
     }
     
-    printf("transmitting on port %d queueid %d count %d\n", port, queueid, n);
+    //printf("transmitting on port %d queueid %d count %d\n", port, queueid, n);
 
     ret = rte_eth_tx_burst(port, queueid, m_table, n);
     if (unlikely(ret < n)) {
@@ -1475,6 +1475,9 @@ send_single_packet(struct rte_mbuf *m, uint8_t port)
     return 0;
 }
 
+int tx_one_pkt=0;
+int tx_burst_pkt=0;
+
 int
 ff_dpdk_if_send(struct ff_dpdk_if_context *ctx, void *m,
     int total)
@@ -1488,8 +1491,10 @@ ff_dpdk_if_send(struct ff_dpdk_if_context *ctx, void *m,
     if (unlikely(len == MAX_PKT_BURST)) {
         send_burst(qconf, MAX_PKT_BURST, ctx->port_id);
         len = 0;
+        tx_burst_pkt++;
     }
     qconf->tx_mbufs[ctx->port_id].len = len;
+    tx_one_pkt++;
     return 0;
 #endif
     struct ff_port_cfg *pconf = &lcore_conf.port_cfgs[ctx->port_id];
@@ -1620,6 +1625,7 @@ ff_dpdk_if_send(struct ff_dpdk_if_context *ctx, void *m,
     return send_single_packet(head, ctx->port_id);
 }
 
+int tx_in_loop=0;
 static int
 main_loop(void *arg)
 {
@@ -1674,6 +1680,8 @@ main_loop(void *arg)
                 send_burst(qconf,
                     qconf->tx_mbufs[port_id].len,
                     port_id);
+
+                tx_in_loop+=qconf->tx_mbufs[port_id].len;
                 qconf->tx_mbufs[port_id].len = 0;
             }
 

@@ -569,7 +569,7 @@ tooshort:
 #endif /* IPSEC */
 
         // PK FIXME
-	if (ip->ip_p==IPPROTO_TCP) {
+	if ((ip->ip_p==IPPROTO_TCP) || (ip->ip_p==IPPROTO_UDP)) {
 	    goto ours;
         }
 

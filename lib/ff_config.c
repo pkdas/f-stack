@@ -702,6 +702,7 @@ static int
 dpdk_args_setup(struct ff_config *cfg)
 {
     int n = 0, i;
+    int single_file_segments=0;
     dpdk_argv[n++] = strdup("f-stack");
     char temp[DPDK_CONFIG_MAXLEN] = {0}, temp2[DPDK_CONFIG_MAXLEN] = {0};
 
@@ -762,11 +763,34 @@ dpdk_args_setup(struct ff_config *cfg)
                                cfg->dpdk.memif_cfgs[i].role,
                                cfg->dpdk.memif_cfgs[i].id);
                 /* optional params */
+                if (cfg->dpdk.memif_cfgs[i].zero_copy) {
+                    char *s_zcopy=",zero-copy=yes";
+                    if (sizeof(temp) > strlen(temp)+strlen(s_zcopy)) {
+                        strcat(temp, s_zcopy);
+                        single_file_segments=1;
+                    }
+                }
+                if (cfg->dpdk.memif_cfgs[i].rsize) {
+                    char s_rsize[32];
+                    if ((cfg->dpdk.memif_cfgs[i].rsize > 10) && (cfg->dpdk.memif_cfgs[i].rsize <= 16)) {
+                        sprintf(s_rsize, ",rsize=%d", cfg->dpdk.memif_cfgs[i].rsize);
+                        if (sizeof(temp) > strlen(temp)+strlen(s_rsize)) {
+                            strcat(temp, s_rsize);
+                        }
+                    } else {
+                        printf("could not add rsize %d %s\n", cfg->dpdk.memif_cfgs[i].rsize, temp);
+                    }
+                }
+
                 dpdk_argv[n++] = strdup(temp);
             }
         }
     }
 #endif
+    if (single_file_segments) {
+        dpdk_argv[n++] = strdup("--single-file-segments");
+        printf("added single-file-segments %s\n", temp);
+    }
 
     if (cfg->dpdk.nb_vdev) {
         for (i=0; i<cfg->dpdk.nb_vdev; i++) {

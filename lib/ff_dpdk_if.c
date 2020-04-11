@@ -1662,7 +1662,7 @@ main_loop(void *arg)
          * TX burst queue drain
          */
         diff_tsc = cur_tsc - prev_tsc;
-        if (unlikely(diff_tsc >= drain_tsc)) {
+        if (unlikely(diff_tsc >= drain_tsc*8)) {
             for (i = 0; i < qconf->nb_tx_port; i++) {
                 port_id = qconf->tx_port_id[i];
         
@@ -1677,9 +1677,7 @@ main_loop(void *arg)
 
                 idle = 0;
 
-                send_burst(qconf,
-                    qconf->tx_mbufs[port_id].len,
-                    port_id);
+                send_burst(qconf, qconf->tx_mbufs[port_id].len, port_id);
 
                 tx_in_loop+=qconf->tx_mbufs[port_id].len;
                 qconf->tx_mbufs[port_id].len = 0;
@@ -1738,6 +1736,8 @@ main_loop(void *arg)
         }
 
         process_msg_ring(qconf->proc_id);
+
+        lr->loop(lr->arg);
 
         div_tsc = rte_rdtsc();
 

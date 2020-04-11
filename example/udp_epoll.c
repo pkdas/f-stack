@@ -66,7 +66,9 @@ struct sockaddr_in clientaddr;
 
 unsigned int serverip=0x05050505;
 unsigned int clientip=0x02020202;
-unsigned int iperfserverip=0x0a0a0a0a;
+unsigned int iperfserverip=0;
+
+unsigned int iperfserveriplist[] = {0x0a0a0a0a, 0x0b0b0b0b, 0x0c0c0c0c,  0x0d0d0d0d, 0x0e0e0e0e, 0x0f0f0f0f};
 
 int loop(void *arg)
 {
@@ -112,7 +114,18 @@ int loop(void *arg)
 
 int main(int argc, char * argv[])
 {
+    int id=atoi(argv[1]);
+    int i=0;
+
+    for (i=2;i < argc; i++) {
+       argv[i-1]=argv[i];
+    }
+    argc--;
+
     ff_init(argc, argv);
+
+    iperfserverip=iperfserveriplist[id];
+    portno=portno+id;
 
     sockfd = ff_socket(AF_INET, SOCK_DGRAM, 0);
     printf("sockfd:%d\n", sockfd);
